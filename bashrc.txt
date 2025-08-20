@@ -1,0 +1,30 @@
+# Switch kubectl context nhanh bằng keyword
+kctx() {
+  local keywords="$1"
+  local contexts context_name contexts_length
+
+  if [ -n "$keywords" ]; then
+    contexts=$(kubectl config get-contexts -o name | grep "$keywords")
+  else
+    contexts=$(kubectl config get-contexts -o name)
+  fi
+
+  contexts_length=$(echo "$contexts" | wc -l | xargs)
+
+  if [ "$contexts_length" -eq 0 ]; then
+    echo "❌ Không tìm thấy context nào."
+    return 1
+  elif [ "$contexts_length" -eq 1 ]; then
+    context_name="$contexts"
+  else
+    context_name=$(echo "$contexts" | fzf)
+  fi
+
+  if [ -n "$context_name" ]; then
+    echo "👉 Switching to context: $context_name"
+    kubectl config use-context "$context_name"
+  else
+    echo "❌ Không chọn context nào."
+  fi
+}
+
