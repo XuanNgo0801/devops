@@ -1,0 +1,37 @@
+# Switch kubectl namespace trong context hiện tại
+kns() {
+  local namespace namespaces ns_length current_context
+
+  current_context=$(kubectl config current-context 2>/dev/null)
+  if [ -z "$current_context" ]; then
+    echo "❌ Chưa có context nào đang được chọn."
+    return 1
+  fi
+
+  namespaces=$(kubectl get ns --no-headers -o custom-columns=":metadata.name")
+  ns_length=$(echo "$namespaces" | wc -l | xargs)
+
+  if [ "$ns_length" -eq 0 ]; then
+    echo "❌ Không tìm thấy namespace nào."
+    return 1
+  elif [ "$ns_length" -eq 1 ]; then
+    namespace="$namespaces"
+  else
+    if command -v fzf >/dev/null 2>&1; then
+      namespace=$(echo "$namespaces" | fzf)
+    else
+      echo "Có nhiều namespace, hãy chọn:"
+      select namespace in $namespaces; do
+        break
+      done
+    fi
+  fi
+
+  if [ -n "$namespace" ]; then
+    echo "👉 Switching namespace to: $namespace (context: $current_context)"
+    kubectl config set-context "$current_context" --namespace="$namespace" >/dev/null
+  else
+    echo "❌ Không chọn namespace nào."
+  fi
+}
+
