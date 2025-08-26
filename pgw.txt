@@ -1,0 +1,106 @@
+1. Pushgateway là gì?
+
+Pushgateway là một thành phần trong hệ sinh thái Prometheus cho phép push (đẩy) metrics từ các ứng dụng hoặc batch job vào, sau đó Pushgateway sẽ expose metrics ra ở endpoint HTTP /metrics để Prometheus có thể scrape.
+
+Thông thường Prometheus sử dụng mô hình pull (Prometheus chủ động scrape metrics từ target), nhưng với các short-lived jobs (chạy nhanh, kết thúc sớm như cronjob, script ETL, CI/CD pipeline), Prometheus có thể không kịp scrape → lúc này cần Pushgateway làm trung gian lưu lại metrics.
+
+2. Khi nào sử dụng Pushgateway?
+
+✅ Nên dùng trong các trường hợp:
+
+Batch job ngắn hạn (cronjob, ETL, script build/test trong CI/CD) cần ghi nhận metrics sau khi chạy.
+
+Ứng dụng không thể mở cổng HTTP để Prometheus scrape trực tiếp.
+
+Khi muốn gom metrics từ nhiều job về một nơi tạm thời trước khi Prometheus lấy.
+
+❌ Không nên dùng cho:
+
+Metrics của service chạy dài hạn (web server, API, database) → nên expose endpoint /metrics trực tiếp.
+
+Metrics yêu cầu real-time high-frequency vì Pushgateway không tối ưu cho luồng lớn liên tục.
+
+3. Cơ chế hoạt động
+
+Ứng dụng/batch job gửi metrics lên Pushgateway qua HTTP API.
+
+Metrics được gắn label job=<job_name> và có thể thêm instance, grouping key.
+
+Pushgateway lưu metrics tạm trong bộ nhớ.
+
+Prometheus scrape Pushgateway endpoint để lấy metrics.
+
+4. Tích hợp Pushgateway
+
+Có nhiều cách push metrics:
+
+4.1. Push trực tiếp bằng HTTP (không cần thư viện)
+
+Ví dụ push bằng curl:
+
+echo "my_batch_job_success 1" \
+  | curl --data-binary @- http://<pushgateway-host>:9091/metrics/job/my_batch_job
+
+
+Thêm label instance:
+
+echo "my_batch_job_duration_seconds 35" \
+  | curl --data-binary @- http://<pushgateway-host>:9091/metrics/job/my_batch_job/instance/instance-1
+
+4.2. Tích hợp bằng Prometheus Client Libraries
+
+Prometheus cung cấp nhiều client library hỗ trợ push:
+
+Python (prometheus_client)
+
+Go (prometheus/client_golang)
+
+Java (simpleclient_pushgateway)
+
+Node.js (prom-client)
+
+📌 Ví dụ Python:
+
+from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+
+registry = CollectorRegistry()
+g = Gauge('my_batch_job_duration_seconds', 'Duration of batch job', registry=registry)
+g.set(35)
+
+push_to_gateway('pushgateway:9091', job='my_batch_job', registry=registry)
+
+5. Yêu cầu & Phụ thuộc
+
+Không bắt buộc phải dùng lib của Pushgateway.
+Bạn có thể gửi raw metrics qua HTTP (như ví dụ curl).
+
+Nếu muốn tích hợp tiện hơn trong code (Python, Go, Java…), nên dùng Prometheus client libraries có sẵn hàm push_to_gateway.
+
+6. Cách kiểm tra
+
+Push metrics thành công → truy cập:
+
+http://<pushgateway-host>:9091/metrics
+
+
+→ thấy metrics vừa push.
+
+Đảm bảo Prometheus có scrape job cho Pushgateway trong prometheus.yml:
+
+scrape_configs:
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['pushgateway:9091']
+
+
+Query trên Prometheus hoặc Grafana:
+
+my_batch_job_duration_seconds
+
+7. Best Practices
+
+Đặt tên job rõ ràng: job="data_etl", job="ci_pipeline".
+
+Dọn dẹp metrics cũ nếu không cần, tránh dữ liệu stale (có thể gọi DELETE API).
+
+Không push metrics từ long-running service.
