@@ -1,0 +1,75 @@
+# Mặc định namespace nếu item không khai báo namespace
+defaultNamespace: monitoring
+
+# Danh sách VMRule resources sẽ được tạo
+rules:
+  - name: node-rules
+    # optional: nếu không có thì sẽ dùng defaultNamespace
+    namespace: monitoring
+    groups:
+      - name: node-alerts
+        rules:
+          - alert: NodeHighCPU
+            expr: 100 - (avg by(instance)(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High CPU usage on {{ $labels.instance }}"
+              description: "CPU usage above 90% for more than 2 minutes"
+
+  - name: app-rules
+    namespace: monitoring
+    groups:
+      - name: app-alerts
+        rules:
+          - alert: AppDown
+            expr: up{job="my-app"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "App my-app is down"
+              description: "The application {{ $labels.job }} on {{ $labels.instance }} is not responding"
+
+  - name: biz-rules-prod
+    namespace: monitoring
+    groups:
+      - name: business-alerts
+        rules:
+          - alert: OrdersDrop
+            expr: rate(order_requests_total[5m]) < 1
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Order requests are dropping"
+              description: "Order requests dropped below threshold in the last 10 minutes"
+---
+{{- /*
+Return the namespace to render for a rule item
+*/ -}}
+{{- define "vmrules.namespace" -}}
+{{- $ns := .namespace | default $.Values.defaultNamespace -}}
+{{- $ns -}}
+{{- end -}}
+
+{{- /*
+Return a safe name for metadata.name (use provided name directly)
+*/ -}}
+{{- define "vmrules.name" -}}
+{{- .name -}}
+{{- end -}}
+---
+{{- $root := . -}}
+{{- range $idx, $rule := .Values.rules }}
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: {{ include "vmrules.name" $rule | quote }}
+  namespace: {{ include "vmrules.namespace" $rule | quote }}
+spec:
+  groups:
+{{ toYaml $rule.groups | indent 4 }}
+{{- end }}
