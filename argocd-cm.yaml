@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+data:
+  # Service definition cho SMS gateway
+  service.webhook.sms-gateway: |
+    url: http://sms-gateway.sms-devops-gateway.svc.cluster.local/argocd
+    headers:
+    - name: Content-Type
+      value: application/json
+
+  # Template cho out of sync
+  template.app-out-of-sync: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application OUT OF SYNC",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}",
+              "syncStatus": "{{.app.status.sync.status}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Template cho sync unknown
+  template.app-sync-unknown: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application sync status UNKNOWN",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}",
+              "syncStatus": "{{.app.status.sync.status}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Trigger khi out of sync
+  trigger.on-out-of-sync: |
+    - description: Application is out of sync
+      send:
+      - app-out-of-sync
+      when: app.status.sync.status == 'OutOfSync'
+      oncePer: app.status.sync.revision
+
+  # Trigger khi sync unknown
+  trigger.on-sync-unknown: |
+    - description: Application sync status is unknown
+      send:
+      - app-sync-unknown
+      when: app.status.sync.status == 'Unknown'
+      oncePer: app.status.sync.status
+
+  # Default subscriptions cho tất cả apps
+  subscriptions: |
+    # Global subscriptions - áp dụng cho tất cả apps
+    - recipients:
+      - sms-gateway
+      triggers:
+      - on-out-of-sync
+      - on-sync-unknown
+
+  # Context để sử dụng trong templates
+  context: |
+    argocdUrl: https://argocd.your-domain.com

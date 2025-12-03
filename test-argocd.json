@@ -1,42 +1,42 @@
 {
-    "message": "Application deployment FAILED",
-    "app": {
-      "metadata": {
-        "name": "my-application",
-        "namespace": "argocd"
+  "message": "Application deployment FAILED",
+  "app": {
+    "metadata": {
+      "name": "my-application",
+      "namespace": "argocd"
+    },
+    "spec": {
+      "project": "production",
+      "source": {
+        "repoURL": "https://github.com/company/app-repo",
+        "path": "k8s/production",
+        "targetRevision": "v1.2.3"
       },
-      "spec": {
-        "project": "production",
-        "source": {
-          "repoURL": "https://github.com/company/app-repo",
-          "path": "k8s/production",
-          "targetRevision": "v1.2.3"
-        },
-        "destination": {
-          "server": "https://kubernetes.default.svc",
-          "namespace": "production"
-        }
-      },
-      "status": {
-        "sync": {
-          "status": "OutOfSync",
-          "revision": "abc123def456"
-        },
-        "health": {
-          "status": "Degraded",
-          "message": "Deployment has minimum availability"
-        },
-        "operationState": {
-          "phase": "Failed",
-          "message": "one or more objects failed to apply",
-          "startedAt": "2025-12-03T10:00:00Z",
-          "finishedAt": "2025-12-03T10:05:00Z"
-        }
+      "destination": {
+        "server": "https://kubernetes.default.svc",
+        "namespace": "production"
       }
     },
-    "context": {
-      "receiver": "alert-ops",
-      "argocdUrl": "https://argocd.example.com"
-    },
-    "serviceType": "argocd"
-  }
+    "status": {
+      "sync": {
+        "status": "OutOfSync",
+        "revision": "abc123def456"
+      },
+      "health": {
+        "status": "Degraded",
+        "message": "Deployment has minimum availability"
+      },
+      "operationState": {
+        "phase": "Failed",
+        "message": "one or more objects failed to apply",
+        "startedAt": "2025-12-03T10:00:00Z",
+        "finishedAt": "2025-12-03T10:05:00Z"
+      }
+    }
+  },
+  "context": {
+    "receiver": "alert-ops",
+    "argocdUrl": "https://argocd.example.com"
+  },
+  "serviceType": "argocd"
+}

@@ -1,0 +1,45 @@
+{
+    "receiver": [
+      {
+        "name": "alert-ops",
+        "mobile": "0901234567, 0912345678",
+        "description": "Production operations team - for critical alerts"
+      },
+      {
+        "name": "alert-devops",
+        "mobile": "0923456789, 0934567890",
+        "description": "DevOps team - for deployment and infrastructure alerts"
+      },
+      {
+        "name": "alert-infra",
+        "mobile": "0945678901",
+        "description": "Infrastructure team - for infra monitoring"
+      },
+      {
+        "name": "alert-d1-lgc-devops",
+        "mobile": "0956789012, 0967890123",
+        "description": "D1 LGC DevOps team - for specific project alerts"
+      }
+    ],
+    "default_receiver": {
+      "mobile": "0978901234",
+      "description": "Default fallback receiver"
+    },
+    "argocd": {
+      "enabled": true,
+      "project_mapping": {
+        "infra": "alert-infra",
+        "devops": "alert-devops",
+        "ops": "alert-ops",
+        "d1-lgc": "alert-d1-lgc-devops",
+        "production": "alert-ops",
+        "staging": "alert-devops",
+        "default": "alert-devops"
+      },
+      "namespace_mapping": {
+        "infra-monitoring": "alert-infra",
+        "production": "alert-ops",
+        "staging": "alert-devops"
+      }
+    }
+  }
