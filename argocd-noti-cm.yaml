@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+data:
+  # Service definition cho SMS gateway
+  service.webhook.sms-gateway: |
+    url: http://sms-gateway.sms-devops-gateway.svc.cluster.local/argocd
+    headers:
+    - name: Content-Type
+      value: application/json
+
+  # Templates cho các loại notification
+  
+  # Template cho deployment thành công
+  template.app-deployed: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application deployed successfully",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Template cho deployment thất bại
+  template.app-deploy-failed: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application deployment FAILED",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}",
+              "error": "{{.app.status.operationState.message}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Template cho sync failed
+  template.app-sync-failed: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application sync FAILED",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Template cho health degraded
+  template.app-health-degraded: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application health DEGRADED",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}",
+              "healthMessage": "{{.app.status.health.message}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Template cho out of sync
+  template.app-out-of-sync: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application OUT OF SYNC",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}",
+              "syncStatus": "{{.app.status.sync.status}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Template cho sync running
+  template.app-sync-running: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application sync started",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Template cho sync succeeded
+  template.app-sync-succeeded: |
+    webhook:
+      sms-gateway:
+        method: POST
+        body: |
+          {
+            "message": "Application synced successfully",
+            "app": {{toJson .app}},
+            "context": {
+              "receiver": "{{.recipient}}",
+              "argocdUrl": "{{.context.argocdUrl}}"
+            },
+            "serviceType": "argocd"
+          }
+
+  # Triggers - định nghĩa khi nào gửi notification
+  
+  # Trigger khi deployment succeeded (production only)
+  trigger.on-deployed: |
+    - description: Application is synced and healthy
+      send:
+      - app-deployed
+      when: app.status.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+      oncePer: app.status.sync.revision
+
+  # Trigger khi deployment failed
+  trigger.on-deploy-failed: |
+    - description: Application deployment failed
+      send:
+      - app-deploy-failed
+      when: app.status.operationState.phase in ['Error', 'Failed']
+      oncePer: app.status.operationState.finishedAt
+
+  # Trigger khi sync failed
+  trigger.on-sync-failed: |
+    - description: Application syncing has failed
+      send:
+      - app-sync-failed  
+      when: app.status.operationState.phase in ['Error', 'Failed']
+      oncePer: app.status.operationState.finishedAt
+
+  # Trigger khi health degraded
+  trigger.on-health-degraded: |
+    - description: Application has degraded
+      send:
+      - app-health-degraded
+      when: app.status.health.status == 'Degraded'
+      oncePer: app.status.health.status
+
+  # Trigger khi out of sync (warning only)
+  trigger.on-out-of-sync: |
+    - description: Application is out of sync
+      send:
+      - app-out-of-sync
+      when: app.status.sync.status == 'OutOfSync'
+      oncePer: app.status.sync.revision
+
+  # Default subscriptions cho tất cả apps
+  subscriptions: |
+    # Global subscriptions - áp dụng cho tất cả apps
+    - recipients:
+      - sms-gateway
+      triggers:
+      - on-deploy-failed
+      - on-sync-failed
+      - on-health-degraded
+
+  # Context để sử dụng trong templates
+  context: |
+    argocdUrl: https://argocd.your-domain.com
