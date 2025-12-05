@@ -1,0 +1,133 @@
+# Tạo thư mục tests
+mkdir -p tests
+cd tests
+
+# Test 1: VictoriaMetrics
+cat > test-vm.json << 'EOF'
+{
+  "receiver": "alert-devops",
+  "status": "firing",
+  "alerts": [{
+    "status": "firing",
+    "labels": {
+      "alertname": "TestAlert",
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "Test VictoriaMetrics alert"
+    }
+  }]
+}
+EOF
+
+# Test 2: ArgoCD app-abc (exact match)
+cat > test-app-abc.json << 'EOF'
+{
+  "message": "App out of sync",
+  "app": {
+    "metadata": {"name": "app-abc"},
+    "spec": {
+      "project": "default",
+      "destination": {"namespace": "production"}
+    },
+    "status": {
+      "sync": {"status": "OutOfSync"}
+    }
+  },
+  "context": {}
+}
+EOF
+
+# Test 3: ArgoCD vhcore-api (prefix match)
+cat > test-vhcore-api.json << 'EOF'
+{
+  "message": "App sync unknown",
+  "app": {
+    "metadata": {"name": "vhcore-api"},
+    "spec": {
+      "project": "vhcore",
+      "destination": {"namespace": "vhcore-prod"}
+    },
+    "status": {
+      "sync": {"status": "Unknown"}
+    }
+  },
+  "context": {}
+}
+EOF
+
+# Test 4: ArgoCD app-mnt (exact match)
+cat > test-app-mnt.json << 'EOF'
+{
+  "message": "App out of sync",
+  "app": {
+    "metadata": {"name": "app-mnt"},
+    "spec": {
+      "project": "default",
+      "destination": {"namespace": "production"}
+    },
+    "status": {
+      "sync": {"status": "OutOfSync"}
+    }
+  },
+  "context": {}
+}
+EOF
+
+# Test 5: ArgoCD vhtt-dashboard (prefix match)
+cat > test-vhtt-dashboard.json << 'EOF'
+{
+  "message": "App out of sync",
+  "app": {
+    "metadata": {"name": "vhtt-dashboard"},
+    "spec": {
+      "project": "vhtt",
+      "destination": {"namespace": "vhtt-prod"}
+    },
+    "status": {
+      "sync": {"status": "OutOfSync"}
+    }
+  },
+  "context": {}
+}
+EOF
+
+# Test 6: ArgoCD synced (should ignore)
+cat > test-synced.json << 'EOF'
+{
+  "message": "App synced",
+  "app": {
+    "metadata": {"name": "healthy-app"},
+    "spec": {
+      "project": "default",
+      "destination": {"namespace": "production"}
+    },
+    "status": {
+      "sync": {"status": "Synced"},
+      "health": {"status": "Healthy"}
+    }
+  },
+  "context": {}
+}
+EOF
+
+# Test 7: Random app (default receiver)
+cat > test-random-app.json << 'EOF'
+{
+  "message": "App out of sync",
+  "app": {
+    "metadata": {"name": "random-app-xyz"},
+    "spec": {
+      "project": "default",
+      "destination": {"namespace": "default"}
+    },
+    "status": {
+      "sync": {"status": "OutOfSync"}
+    }
+  },
+  "context": {}
+}
+EOF
+
+echo "✅ Test files created"
+ls -la
