@@ -1,0 +1,46 @@
+{
+    "receiver": [
+      {
+        "name": "alert-devops",
+        "mobile": "0901234567, 0912345678",
+        "description": "Team DevOps"
+      },
+      {
+        "name": "alert-vhcore",
+        "mobile": "0923456789, 0934567890",
+        "description": "Team VHCore"
+      },
+      {
+        "name": "alert-vhcautruc",
+        "mobile": "0945678901, 0956789012",
+        "description": "Team VHCauTruc - Cấu trúc"
+      },
+      {
+        "name": "alert-vhtt",
+        "mobile": "0967890123, 0978901234",
+        "description": "Team VHTT - Thông tin"
+      }
+    ],
+    "default_receiver": {
+      "mobile": "0989012345",
+      "description": "Default fallback to DevOps"
+    },
+    "argocd": {
+      "enabled": true,
+      "app_mapping": {
+        "app-abc": "alert-vhcore",
+        "app-def": "alert-vhcore",
+        "app-mnt": "alert-vhcautruc",
+        "app-akf": "alert-vhtt"
+      },
+      "app_prefix_mapping": {
+        "vhcore-": "alert-vhcore",
+        "core-": "alert-vhcore",
+        "vhcautruc-": "alert-vhcautruc",
+        "cautruc-": "alert-vhcautruc",
+        "vhtt-": "alert-vhtt",
+        "tt-": "alert-vhtt"
+      },
+      "default_receiver": "alert-devops"
+    }
+  }

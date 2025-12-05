@@ -1,13 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"sms-devops-gateway/config"
 	"sms-devops-gateway/forwarder"
@@ -66,10 +63,8 @@ type ArgocdHealth struct {
 }
 
 type ArgocdOperation struct {
-	Phase      string    `json:"phase"`
-	Message    string    `json:"message"`
-	StartedAt  time.Time `json:"startedAt"`
-	FinishedAt time.Time `json:"finishedAt"`
+	Phase      string `json:"phase"`
+	Message    string `json:"message"`
 }
 
 // processArgocdNotification xử lý ArgoCD notification và gửi SMS
@@ -77,26 +72,26 @@ func processArgocdNotification(notif ArgocdNotification, cfg *config.Config, w h
 	// Build SMS message
 	message := buildArgocdMessage(notif)
 	if message == "" {
-		logFile.WriteString(fmt.Sprintf("[%s] ⚠️ ArgoCD notification ignored (no significant event)\n", time.Now().Format(time.RFC3339)))
+		logFile.WriteString(fmt.Sprintf("⚠️ ArgoCD notification ignored (no significant event)\n"))
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ArgoCD notification ignored"))
 		return
 	}
 
-	logFile.WriteString(fmt.Sprintf("[%s] 📤 Built ArgoCD message: %s\n", time.Now().Format(time.RFC3339), message))
+	logFile.WriteString(fmt.Sprintf("📤 Built ArgoCD message: %s\n", message))
 
 	// Determine receiver
 	receiver := determineArgocdReceiver(notif, cfg)
-	logFile.WriteString(fmt.Sprintf("[%s] 🎯 Target receiver: %s\n", time.Now().Format(time.RFC3339), receiver.Name))
+	logFile.WriteString(fmt.Sprintf("🎯 Target receiver: %s\n", receiver.Name))
 
 	// Forward SMS
 	if err := forwarder.SendSMS(receiver.Mobile, message); err != nil {
-		logFile.WriteString(fmt.Sprintf("[%s] ❌ Error sending ArgoCD SMS: %v\n", time.Now().Format(time.RFC3339), err))
+		logFile.WriteString(fmt.Sprintf("❌ Error sending ArgoCD SMS: %v\n", err))
 		http.Error(w, "error forwarding SMS", http.StatusInternalServerError)
 		return
 	}
 
-	logFile.WriteString(fmt.Sprintf("[%s] ✅ ArgoCD SMS sent to receiver: %s\n", time.Now().Format(time.RFC3339), receiver.Name))
+	logFile.WriteString(fmt.Sprintf("✅ ArgoCD SMS sent to receiver: %s\n", receiver.Name))
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ArgoCD notification processed ✅"))
 }
@@ -109,8 +104,6 @@ func buildArgocdMessage(notif ArgocdNotification) string {
 	project := app.Spec.Project
 	
 	syncStatus := app.Status.Sync.Status
-	healthStatus := app.Status.Health.Status
-	phase := app.Status.OperationState.Phase
 	
 	// Chỉ alert 2 trường hợp sync status
 	shouldAlert := false
@@ -143,17 +136,12 @@ func buildArgocdMessage(notif ArgocdNotification) string {
 		parts = append(parts, fmt.Sprintf("NS: %s", namespace))
 	}
 	
-	// Thêm sync status nếu có vấn đề
-	if syncStatus != "" && syncStatus != "Synced" {
+	// Thêm sync status
+	if syncStatus != "" {
 		parts = append(parts, fmt.Sprintf("Sync: %s", syncStatus))
 	}
 	
-	// Thêm health status nếu có vấn đề
-	if healthStatus != "" && healthStatus != "Healthy" {
-		parts = append(parts, fmt.Sprintf("Health: %s", healthStatus))
-	}
-	
-	// Thêm message từ operation state
+	// Thêm message từ operation state nếu có
 	if app.Status.OperationState.Message != "" {
 		parts = append(parts, fmt.Sprintf("Msg: %s", truncateString(app.Status.OperationState.Message, 50)))
 	}
@@ -168,7 +156,9 @@ func buildArgocdMessage(notif ArgocdNotification) string {
 
 // determineArgocdReceiver xác định receiver cho ArgoCD notification
 func determineArgocdReceiver(notif ArgocdNotification, cfg *config.Config) config.Receiver {
-	// Ưu tiên 1: Lấy từ context nếu có receiver được chỉ định
+	appName := notif.App.Metadata.Name
+	
+	// Ưu tiên 1: Lấy từ context nếu có receiver được chỉ định (từ annotation)
 	if contextReceiver, ok := notif.Context["receiver"].(string); ok && contextReceiver != "" {
 		for _, r := range cfg.Receiver {
 			if r.Name == contextReceiver {
@@ -177,43 +167,69 @@ func determineArgocdReceiver(notif ArgocdNotification, cfg *config.Config) confi
 		}
 	}
 	
-	// Ưu tiên 2: Dựa vào project name
-	project := notif.App.Spec.Project
-	projectMapping := map[string]string{
-		"infra":        "alert-infra",
-		"devops":       "alert-devops",
-		"ops":          "alert-ops",
-		"d1-lgc":       "alert-d1-lgc-devops",
-		"production":   "alert-ops",
-		"staging":      "alert-devops",
-	}
-	
-	if receiverName, ok := projectMapping[strings.ToLower(project)]; ok {
-		for _, r := range cfg.Receiver {
-			if r.Name == receiverName {
-				return r
+	// Ưu tiên 2: Exact match - Dựa vào tên application (từ config.json)
+	if cfg.ArgoCD != nil && cfg.ArgoCD.AppMapping != nil {
+		if receiverName, ok := cfg.ArgoCD.AppMapping[appName]; ok {
+			for _, r := range cfg.Receiver {
+				if r.Name == receiverName {
+					return r
+				}
 			}
 		}
 	}
 	
-	// Ưu tiên 3: Dựa vào namespace
-	namespace := notif.App.Spec.Destination.Namespace
-	if strings.Contains(namespace, "infra") {
-		for _, r := range cfg.Receiver {
-			if r.Name == "alert-infra" {
-				return r
-			}
-		}
-	}
-	if strings.Contains(namespace, "monitoring") {
-		for _, r := range cfg.Receiver {
-			if r.Name == "alert-devops" {
-				return r
+	// Ưu tiên 3: Prefix matching - Dựa vào prefix của app name (từ config.json)
+	if cfg.ArgoCD != nil && cfg.ArgoCD.AppPrefixMapping != nil {
+		for prefix, receiverName := range cfg.ArgoCD.AppPrefixMapping {
+			if strings.HasPrefix(appName, prefix) {
+				for _, r := range cfg.Receiver {
+					if r.Name == receiverName {
+						return r
+					}
+				}
 			}
 		}
 	}
 	
-	// Default: trả về default receiver
+	// Ưu tiên 4: Project mapping (fallback)
+	if cfg.ArgoCD != nil && cfg.ArgoCD.ProjectMapping != nil {
+		project := notif.App.Spec.Project
+		if receiverName, ok := cfg.ArgoCD.ProjectMapping[strings.ToLower(project)]; ok {
+			for _, r := range cfg.Receiver {
+				if r.Name == receiverName {
+					return r
+				}
+			}
+		}
+	}
+	
+	// Ưu tiên 5: Namespace mapping (fallback)
+	if cfg.ArgoCD != nil && cfg.ArgoCD.NamespaceMapping != nil {
+		namespace := notif.App.Spec.Destination.Namespace
+		for nsPattern, receiverName := range cfg.ArgoCD.NamespaceMapping {
+			if strings.Contains(namespace, nsPattern) {
+				for _, r := range cfg.Receiver {
+					if r.Name == receiverName {
+						return r
+					}
+				}
+			}
+		}
+	}
+	
+	// Default: Dùng default_receiver từ ArgoCD config hoặc alert-devops
+	defaultReceiverName := "alert-devops"
+	if cfg.ArgoCD != nil && cfg.ArgoCD.DefaultReceiver != "" {
+		defaultReceiverName = cfg.ArgoCD.DefaultReceiver
+	}
+	
+	for _, r := range cfg.Receiver {
+		if r.Name == defaultReceiverName {
+			return r
+		}
+	}
+	
+	// Last fallback: default receiver từ config
 	return config.Receiver{
 		Name:   "default",
 		Mobile: cfg.DefaultReceiver.Mobile,
