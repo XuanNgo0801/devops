@@ -2,27 +2,27 @@
     "receiver": [
       {
         "name": "alert-devops",
-        "mobile": "0901234567, 0912345678",
+        "mobile": "0379204902",
         "description": "Team DevOps"
       },
       {
         "name": "alert-vhcore",
-        "mobile": "0923456789, 0934567890",
+        "mobile": "0379204902",
         "description": "Team VHCore"
       },
       {
         "name": "alert-vhcautruc",
-        "mobile": "0945678901, 0956789012",
+        "mobile": "0379204902",
         "description": "Team VHCauTruc - Cấu trúc"
       },
       {
         "name": "alert-vhtt",
-        "mobile": "0967890123, 0978901234",
+        "mobile": "0379204902",
         "description": "Team VHTT - Thông tin"
       }
     ],
     "default_receiver": {
-      "mobile": "0989012345",
+      "mobile": "0379204902",
       "description": "Default fallback to DevOps"
     },
     "argocd": {
