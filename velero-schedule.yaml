@@ -1,0 +1,88 @@
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-pv-pvc-backup
+  namespace: velero
+spec:
+  # Chạy backup vào lúc 24h (0h) mỗi ngày (theo múi giờ UTC)
+  schedule: "0 0 * * *"
+  
+  template:
+    # Tên backup sẽ có format: daily-pv-pvc-backup-<timestamp>
+    # Velero tự động thêm timestamp vào tên backup
+    
+    # Include namespace cần backup (thay 'your-namespace' bằng tên namespace của bạn)
+    includedNamespaces:
+    - your-namespace
+    
+    # Include các resource cần backup
+    includedResources:
+    - persistentvolumeclaims
+    - persistentvolumes
+    
+    # Backup toàn bộ PV data
+    snapshotVolumes: true
+    
+    # Sử dụng volume snapshot nếu storage class hỗ trợ
+    defaultVolumesToFsBackup: false
+    
+    # Label selector (tùy chọn - nếu muốn backup theo label)
+    # labelSelector:
+    #   matchLabels:
+    #     app: myapp
+    
+    # Storage location (nếu có nhiều backup storage)
+    # storageLocation: default
+    
+    # Volume snapshot location
+    # volumeSnapshotLocations:
+    # - default
+    
+    # TTL - thời gian lưu trữ backup (720h = 30 ngày)
+    ttl: 720h
+    
+    # Hooks để chạy trước/sau backup (tùy chọn)
+    # hooks:
+    #   resources:
+    #   - name: freeze-database
+    #     includedNamespaces:
+    #     - your-namespace
+    #     labelSelector:
+    #       matchLabels:
+    #         app: database
+    #     pre:
+    #     - exec:
+    #         command:
+    #         - /bin/bash
+    #         - -c
+    #         - /scripts/freeze.sh
+    #     post:
+    #     - exec:
+    #         command:
+    #         - /bin/bash
+    #         - -c
+    #         - /scripts/unfreeze.sh
+
+---
+# Ví dụ schedule backup mỗi 6 giờ
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: every-6h-pv-pvc-backup
+  namespace: velero
+spec:
+  # Chạy vào các giờ 0, 6, 12, 18
+  schedule: "0 */6 * * *"
+  
+  template:
+    includedNamespaces:
+    - your-namespace
+    
+    includedResources:
+    - persistentvolumeclaims
+    - persistentvolumes
+    
+    snapshotVolumes: true
+    
+    # Giữ backup trong 168h (7 ngày)
+    ttl: 168h
